@@ -76,6 +76,16 @@ python -m demo.cli
 
 The demo replays the canonical worked example from [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §7 and prints each submit, the resulting trades, and the order book before and after a cancel.
 
+### Install from a release
+
+Wheels are attached to each [GitHub release](https://github.com/vikaspal1704/mini-matching-engine/releases):
+
+```bash
+pip install https://github.com/vikaspal1704/mini-matching-engine/releases/download/v0.1.0/matching_engine-0.1.0-py3-none-any.whl
+```
+
+Maintainers: bump `version` in `pyproject.toml`, then push a matching tag (`git tag v0.1.0 && git push origin v0.1.0`); `.github/workflows/release.yml` tests, builds and publishes the release.
+
 ## Quick usage
 
 ```python
