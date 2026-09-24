@@ -6,7 +6,7 @@ Built as a portfolio project by **Vikas Pal** (Software Engineer, Fintech) to de
 
 | | |
 |---|---|
-| **Status** | Docs-first — implementation pending |
+| **Status** | Implemented — see [`tests/`](tests/) and [CI](.github/workflows/ci.yml) |
 | **Language** | Python 3.11+ |
 | **License** | [MIT](LICENSE) |
 | **Repo** | https://github.com/vikaspal1704/mini-matching-engine |
@@ -55,7 +55,7 @@ Built as a portfolio project by **Vikas Pal** (Software Engineer, Fintech) to de
 
 ---
 
-## How to run (once implemented)
+## How to run
 
 ```bash
 # Clone
@@ -74,7 +74,43 @@ pytest -q
 python -m demo.cli
 ```
 
-Expected demo behavior: seed a few limit orders, print resulting trades and an order-book snapshot to stdout.
+The demo replays the canonical worked example from [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §7 and prints each submit, the resulting trades, and the order book before and after a cancel.
+
+### Install from a release
+
+Wheels are attached to each [GitHub release](https://github.com/vikaspal1704/mini-matching-engine/releases):
+
+```bash
+pip install https://github.com/vikaspal1704/mini-matching-engine/releases/download/v0.1.0/matching_engine-0.1.0-py3-none-any.whl
+```
+
+Maintainers: bump `version` in `pyproject.toml`, then push a matching tag (`git tag v0.1.0 && git push origin v0.1.0`); `.github/workflows/release.yml` tests, builds and publishes the release.
+
+## Quick usage
+
+```python
+from matching_engine import MatchingEngine, OrderSide
+
+engine = MatchingEngine("DEMO")
+engine.submit_limit(OrderSide.SELL, price=100, quantity=10)
+result = engine.submit_limit(OrderSide.BUY, price=101, quantity=4)
+
+result.trades        # [Trade(trade_id=1, ..., price=100, quantity=4)]  — maker price
+engine.get_book()    # OrderBookSnapshot(symbol='DEMO', bids=[], asks=[BookLevel(100, 6, 1)])
+engine.get_order(1)  # Order(..., remaining_quantity=6, status=OrderStatus.PARTIAL)
+```
+
+## Project layout
+
+```
+matching_engine/   # public API re-exported from __init__.py
+  types.py         # OrderSide, OrderStatus, Order, Trade, BookLevel, snapshots
+  errors.py        # MatchingEngineError hierarchy
+  book.py          # internal price levels: dict[price, deque[Order]] per side
+  engine.py        # MatchingEngine: validate -> match -> rest / cancel
+demo/cli.py        # python -m demo.cli
+tests/             # pytest suite (all required scenarios from docs/TEST_PLAN.md)
+```
 
 ---
 
