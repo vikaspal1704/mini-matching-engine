@@ -84,7 +84,7 @@ Wheels are attached to each [GitHub release](https://github.com/vikaspal1704/min
 pip install https://github.com/vikaspal1704/mini-matching-engine/releases/download/v0.1.0/matching_engine-0.1.0-py3-none-any.whl
 ```
 
-Maintainers: bump `version` in `pyproject.toml`, then push a matching tag (`git tag v0.1.0 && git push origin v0.1.0`); `.github/workflows/release.yml` tests, builds and publishes the release.
+Maintainers: bump `version` in `pyproject.toml`, then either push a matching tag (`git tag v0.1.0 && git push origin v0.1.0`) or run the **Release** workflow manually on `main` from the Actions tab. `.github/workflows/release.yml` tests, builds and publishes the release.
 
 ## Quick usage
 
