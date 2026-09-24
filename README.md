@@ -10,6 +10,7 @@ Built as a portfolio project by **Vikas Pal** (Software Engineer, Fintech) to de
 | **Language** | Python 3.11+ |
 | **License** | [MIT](LICENSE) |
 | **Repo** | https://github.com/vikaspal1704/mini-matching-engine |
+| **Playground** | https://vikaspal1704.github.io/mini-matching-engine/ (runs the engine in your browser) |
 
 ---
 
@@ -76,6 +77,12 @@ python -m demo.cli
 
 The demo replays the canonical worked example from [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §7 and prints each submit, the resulting trades, and the order book before and after a cancel.
 
+### Try it in the browser
+
+The [playground](https://vikaspal1704.github.io/mini-matching-engine/) runs the real `matching_engine` package in your browser with [Pyodide](https://pyodide.org). You can submit and cancel limit orders, watch trades execute at the maker price, and replay the worked example from `docs/ARCHITECTURE.md` §7. Nothing runs on a server.
+
+It is `site/index.html`, published by `.github/workflows/pages.yml` on every push to `main` together with a freshly built wheel. To run it locally, build the wheel, copy it next to `site/index.html` with a `wheel.json` manifest (`{"wheel": "<file>.whl", "version": "0.1.0"}`), and serve the folder with `python -m http.server`.
+
 ### Install from a release
 
 Wheels are attached to each [GitHub release](https://github.com/vikaspal1704/mini-matching-engine/releases):
@@ -109,6 +116,7 @@ matching_engine/   # public API re-exported from __init__.py
   book.py          # internal price levels: dict[price, deque[Order]] per side
   engine.py        # MatchingEngine: validate -> match -> rest / cancel
 demo/cli.py        # python -m demo.cli
+site/index.html    # browser playground (GitHub Pages + Pyodide)
 tests/             # pytest suite (all required scenarios from docs/TEST_PLAN.md)
 ```
 
