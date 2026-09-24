@@ -1,8 +1,12 @@
 name: Release
 
+# Publish by pushing a version tag (git tag v0.1.0 && git push origin v0.1.0),
+# or run this workflow manually from the Actions tab on main: it then tags the
+# commit as v<version from pyproject.toml>.
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -19,10 +23,15 @@ jobs:
         run: |
           pip install -e ".[dev]"
           pytest -q
-      - name: Check tag matches package version
+      - name: Resolve release tag
         run: |
           version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          test "v$version" = "$GITHUB_REF_NAME" || { echo "::error::tag $GITHUB_REF_NAME != pyproject version $version"; exit 1; }
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            test "v$version" = "$GITHUB_REF_NAME" || { echo "::error::tag $GITHUB_REF_NAME != pyproject version $version"; exit 1; }
+          elif [ "$GITHUB_REF_NAME" != "main" ]; then
+            echo "::error::manual releases must run on main, not $GITHUB_REF_NAME"; exit 1
+          fi
+          echo "TAG=v$version" >> "$GITHUB_ENV"
       - name: Build sdist and wheel
         run: |
           pip install build
@@ -30,4 +39,5 @@ jobs:
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
+        # --target tags this commit when the tag does not exist yet (manual runs).
+        run: gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "$TAG" --generate-notes
