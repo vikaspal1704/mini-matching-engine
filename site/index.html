@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matching Engine Playground</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Submit and cancel limit orders against the real mini-matching-engine Python package, running in your browser with Pyodide.">
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --text: #1c1c1a; --muted: #6b6a66; --border: #e3e2de;
+    --bid: #1a7f4b; --bid-bar: rgba(26, 127, 75, 0.14); --ask: #c0392b; --ask-bar: rgba(192, 57, 43, 0.14);
+    --accent: #2f5fd0; --accent-text: #ffffff; --bad: #c0392b; --flash: rgba(230, 170, 30, 0.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --panel: #1d1d1b; --text: #ecebe7; --muted: #9a9993; --border: #2e2d2a;
+      --bid: #4cc38a; --bid-bar: rgba(76, 195, 138, 0.16); --ask: #ef6b5e; --ask-bar: rgba(239, 107, 94, 0.16);
+      --accent: #7c9cf0; --accent-text: #10131a; --bad: #ef6b5e; --flash: rgba(230, 170, 30, 0.28);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; max-width: 70ch; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .panel h2 { font-size: 13px; font-weight: 600; margin: 0; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .controls { display: flex; flex-wrap: wrap; align-items: end; gap: 10px 12px; padding: 12px; margin-bottom: 16px; }
+  label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+  input, select, button { font: inherit; color: inherit; }
+  input, select { width: 110px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; padding: 6px 14px; background: var(--bg); cursor: pointer; }
+  .seg button[aria-pressed="true"].buy { background: var(--bid); color: #fff; }
+  .seg button[aria-pressed="true"].sell { background: var(--ask); color: #fff; }
+  button.primary { padding: 7px 16px; border: 0; border-radius: 6px; background: var(--accent); color: var(--accent-text); cursor: pointer; }
+  button.ghost { padding: 7px 12px; border: 1px solid var(--border); border-radius: 6px; background: transparent; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .spacer { flex: 1; }
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .wide { grid-column: 1 / -1; }
+  .scroll { max-height: 360px; overflow: auto; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 4px 12px; text-align: right; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; position: sticky; top: 0; background: var(--panel); }
+  th:first-child, td:first-child { text-align: left; }
+  tr.bid { background: linear-gradient(to right, var(--bid-bar) var(--pct), transparent var(--pct)); }
+  tr.ask { background: linear-gradient(to right, var(--ask-bar) var(--pct), transparent var(--pct)); }
+  tr.bid td.px, .buy-text { color: var(--bid); } tr.ask td.px, .sell-text { color: var(--ask); }
+  tr.spread td { color: var(--muted); font-size: 12px; text-align: center; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  tr.new td { animation: flash 1s ease-out; }
+  @keyframes flash { from { background: var(--flash); } to { background: transparent; } }
+  td button { padding: 1px 8px; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; font-size: 12px; }
+  .empty { color: var(--muted); text-align: center; padding: 14px; white-space: normal; }
+  .log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 8px 12px; margin: 0; max-height: 220px; overflow: auto; }
+  .log .err { color: var(--bad); }
+  #status { color: var(--muted); font-size: 13px; }
+  footer { margin-top: 20px; color: var(--muted); font-size: 13px; }
+  footer a { color: inherit; }
+  @media (prefers-reduced-motion: reduce) { tr.new td { animation: none; } }
+  @media (max-width: 760px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    input, select { width: 90px; }
+    th, td { padding: 4px 6px; }
+    table { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Matching Engine Playground</h1>
+  <p class="sub">
+    Limit orders against the real <code>matching_engine</code> Python package, running in your browser with Pyodide.
+    The engine uses price-time priority: the best price matches first, and orders at the same price match first-in, first-out.
+    Trades execute at the resting (maker) order's price.
+  </p>
+
+  <section class="panel controls" aria-label="Order entry">
+    <div class="seg" role="group" aria-label="Side">
+      <button type="button" class="buy" data-side="BUY" aria-pressed="true">Buy</button>
+      <button type="button" class="sell" data-side="SELL" aria-pressed="false">Sell</button>
+    </div>
+    <label>Price (ticks)<input id="price" type="number" step="1" value="100"></label>
+    <label>Quantity<input id="qty" type="number" step="1" value="5"></label>
+    <button id="submit" class="primary" disabled>Submit limit order</button>
+    <span class="spacer"></span>
+    <button id="example" class="ghost" disabled>Run worked example</button>
+    <button id="reset" class="ghost" disabled>Reset</button>
+    <span id="status" role="status">Loading Python runtime…</span>
+  </section>
+
+  <div class="grid">
+    <section class="panel" aria-label="Order book">
+      <h2>Order book</h2>
+      <table>
+        <thead><tr><th>Price</th><th>Quantity</th><th>Orders</th></tr></thead>
+        <tbody id="asks"></tbody>
+        <tbody><tr class="spread"><td colspan="3" id="spread">empty book</td></tr></tbody>
+        <tbody id="bids"></tbody>
+      </table>
+    </section>
+    <section class="panel" aria-label="Trades">
+      <h2>Trades (newest first)</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>#</th><th>Price</th><th>Qty</th><th>Buy</th><th>Sell</th></tr></thead>
+          <tbody id="trades"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel wide" aria-label="Orders">
+      <h2>Orders</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>#</th><th>Side</th><th>Price</th><th title="Original quantity">Qty</th><th title="Remaining quantity">Left</th><th>Status</th><th></th></tr></thead>
+          <tbody id="orders"></tbody>
+        </table>
+      </div>
+    </section>
+    <section class="panel wide" aria-label="Event log">
+      <h2>Event log</h2>
+      <div class="log" id="log" role="log"></div>
+    </section>
+  </div>
+
+  <footer>
+    In-memory and single-symbol (<code>DEMO</code>); everything resets on reload.
+    <a href="https://github.com/vikaspal1704/mini-matching-engine">Source and docs</a> ·
+    <a href="https://github.com/vikaspal1704/mini-matching-engine/releases">Releases</a>
+  </footer>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const PYODIDE_VERSION = "0.26.4";
+  const LOCAL_HOSTS = ["localhost", "127.0.0.1"];
+
+  // Thin bridge over the public matching_engine API; returns JSON strings.
+  const BRIDGE = `
+import json
+from dataclasses import asdict
+from matching_engine import MatchingEngine, MatchingEngineError, OrderSide
+
+engine = MatchingEngine("DEMO")
+
+def _order(o):
+    d = asdict(o)
+    d["side"], d["status"] = o.side.value, o.status.value
+    return d
+
+def _error(e):
+    return json.dumps({"error": type(e).__name__, "message": str(e)})
+
+def reset():
+    global engine
+    engine = MatchingEngine("DEMO")
+
+def submit(side, price, quantity):
+    try:
+        result = engine.submit_limit(OrderSide(side), price, quantity)
+    except (MatchingEngineError, ValueError) as e:
+        return _error(e)
+    return json.dumps({"order": _order(result.order), "trades": [asdict(t) for t in result.trades]})
+
+def cancel(order_id):
+    try:
+        return json.dumps({"order": _order(engine.cancel(order_id))})
+    except MatchingEngineError as e:
+        return _error(e)
+
+def state(max_order_id):
+    book = engine.get_book()
+    return json.dumps({
+        "bids": [asdict(l) for l in book.bids],
+        "asks": [asdict(l) for l in book.asks],
+        "orders": [_order(engine.get_order(i)) for i in range(max_order_id, 0, -1)],
+    })
+`;
+
+  const $ = (id) => document.getElementById(id);
+  let py = null;
+  let side = "BUY";
+  let maxOrderId = 0;
+  let trades = [];
+  let freshTradeIds = new Set();
+
+  function log(text, isError = false) {
+    const el = document.createElement("div");
+    if (isError) el.className = "err";
+    el.textContent = text;
+    $("log").prepend(el);
+  }
+
+  function call(fn, ...args) {
+    const out = JSON.parse(py.globals.get(fn)(...args));
+    return out;
+  }
+
+  function submitOrder(orderSide, price, qty, quiet = false) {
+    const res = call("submit", orderSide, price, qty);
+    if (res.error) {
+      log(`✗ ${orderSide} ${qty} @ ${price} rejected: ${res.error}: ${res.message}`, true);
+      return;
+    }
+    const o = res.order;
+    maxOrderId = Math.max(maxOrderId, o.order_id);
+    freshTradeIds = new Set(res.trades.map((t) => t.trade_id));
+    trades = res.trades.slice().reverse().concat(trades);
+    if (!quiet) {
+      log(`#${o.order_id} ${o.side} ${o.original_quantity} @ ${o.price} → ${o.status}` +
+        (res.trades.length ? `, ${res.trades.length} trade(s): ` +
+          res.trades.map((t) => `${t.quantity}@${t.price}`).join(", ") : ", resting"));
+    }
+  }
+
+  function cancelOrder(id) {
+    const res = call("cancel", id);
+    if (res.error) log(`✗ cancel #${id}: ${res.error}: ${res.message}`, true);
+    else log(`#${id} cancelled`);
+    render();
+  }
+
+  function levelRows(levels, cls, maxQty) {
+    return levels.map((l) => {
+      const pct = Math.max(2, Math.round((l.quantity / maxQty) * 100));
+      return `<tr class="${cls}" style="--pct:${pct}%"><td class="px">${l.price}</td>` +
+        `<td>${l.quantity}</td><td>${l.order_count}</td></tr>`;
+    }).join("");
+  }
+
+  function render() {
+    const s = call("state", maxOrderId);
+    const maxQty = Math.max(1, ...s.bids.map((l) => l.quantity), ...s.asks.map((l) => l.quantity));
+    $("asks").innerHTML = s.asks.length ? levelRows(s.asks.slice().reverse(), "ask", maxQty)
+      : '<tr><td colspan="3" class="empty">no asks</td></tr>';
+    $("bids").innerHTML = s.bids.length ? levelRows(s.bids, "bid", maxQty)
+      : '<tr><td colspan="3" class="empty">no bids</td></tr>';
+    const bb = s.bids[0], ba = s.asks[0];
+    $("spread").textContent = bb && ba ? `spread ${ba.price - bb.price} (best bid ${bb.price} / best ask ${ba.price})`
+      : (bb || ba ? "one side empty" : "empty book");
+
+    $("trades").innerHTML = trades.length ? trades.map((t) =>
+      `<tr class="${freshTradeIds.has(t.trade_id) ? "new" : ""}"><td>${t.trade_id}</td><td>${t.price}</td>` +
+      `<td>${t.quantity}</td><td>#${t.buy_order_id}</td><td>#${t.sell_order_id}</td></tr>`).join("")
+      : '<tr><td colspan="5" class="empty">No trades yet: submit a buy at or above the best ask (or a sell at or below the best bid).</td></tr>';
+    freshTradeIds = new Set();
+
+    $("orders").innerHTML = s.orders.length ? s.orders.map((o) => {
+      const live = o.status === "OPEN" || o.status === "PARTIAL";
+      return `<tr><td>${o.order_id}</td><td class="${o.side === "BUY" ? "buy-text" : "sell-text"}">${o.side}</td>` +
+        `<td>${o.price}</td><td>${o.original_quantity}</td><td>${o.remaining_quantity}</td><td>${o.status}</td>` +
+        `<td>${live ? `<button data-cancel="${o.order_id}" title="Cancel order ${o.order_id}" aria-label="Cancel order ${o.order_id}">✕</button>` : ""}</td></tr>`;
+    }).join("") : '<tr><td colspan="7" class="empty">No orders yet.</td></tr>';
+  }
+
+  function resetEngine() {
+    py.globals.get("reset")();
+    maxOrderId = 0;
+    trades = [];
+    $("log").innerHTML = "";
+    render();
+  }
+
+  function runExample() {
+    // docs/ARCHITECTURE.md §7: the canonical worked example.
+    resetEngine();
+    log("Worked example (ARCHITECTURE §7): two sells rest at 100, then two buys cross them.");
+    submitOrder("SELL", 100, 10);
+    submitOrder("SELL", 100, 5);
+    submitOrder("BUY", 101, 3);
+    submitOrder("BUY", 100, 10);
+    log("Order #2 still rests with 2 lots; cancel it in the Orders table to empty the book.");
+    render();
+  }
+
+  function pyodideBase() {
+    // Local testing may point at a self-hosted Pyodide; the public page always uses the CDN.
+    const override = new URLSearchParams(location.search).get("pyodide");
+    if (override && LOCAL_HOSTS.includes(location.hostname)) return override;
+    return `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+  }
+
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.onload = resolve;
+      s.onerror = () => reject(new Error(`failed to load ${src}`));
+      document.head.append(s);
+    });
+  }
+
+  async function boot() {
+    const base = pyodideBase();
+    await loadScript(base + "pyodide.js");
+    py = await loadPyodide({ indexURL: base });
+    $("status").textContent = "Installing matching_engine…";
+    const manifest = await (await fetch("wheel.json")).json();
+    const wheel = await (await fetch(manifest.wheel)).arrayBuffer();
+    py.unpackArchive(wheel, "wheel");
+    py.runPython(BRIDGE);
+    $("status").textContent = `Ready · matching_engine ${manifest.version}`;
+    for (const id of ["submit", "example", "reset"]) $(id).disabled = false;
+    render();
+  }
+
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+    side = b.dataset.side;
+    document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  }));
+  $("submit").addEventListener("click", () => {
+    const price = Number($("price").value), qty = Number($("qty").value);
+    if ($("price").value === "" || $("qty").value === "" || Number.isNaN(price) || Number.isNaN(qty)) {
+      log("✗ enter a price and a quantity", true);
+      return;
+    }
+    submitOrder(side, price, qty);
+    render();
+  });
+  $("example").addEventListener("click", runExample);
+  $("reset").addEventListener("click", resetEngine);
+  $("orders").addEventListener("click", (e) => {
+    const id = e.target.dataset && e.target.dataset.cancel;
+    if (id) cancelOrder(Number(id));
+  });
+
+  boot().catch((err) => {
+    $("status").textContent = "Failed to load the Python runtime: " + err.message;
+    log(String(err), true);
+  });
+})();
+</script>
+</body>
+</html>
